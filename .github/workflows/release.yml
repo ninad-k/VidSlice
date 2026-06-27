@@ -1,0 +1,99 @@
+name: Release
+
+# Builds a self-contained Windows app, an Inno Setup installer, and a portable
+# zip, then publishes them as a GitHub Release.
+#
+# Trigger either by:
+#   * pushing a tag like v1.0.0, or
+#   * running this workflow manually (Actions tab) and entering a version.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $v = '${{ github.event.inputs.version }}'.Trim()
+          } else {
+            $v = '${{ github.ref_name }}' -replace '^v', ''
+          }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version '$v' must look like 1.0.0" }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=v$v"    | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Releasing version $v"
+
+      - name: Restore
+        run: dotnet restore VidSlice.slnx
+
+      - name: Test
+        run: dotnet test VidSlice.slnx -c Release
+
+      - name: Bundle ffmpeg (essentials build)
+        shell: pwsh
+        run: ./build/fetch-ffmpeg.ps1
+
+      - name: Publish (self-contained, win-x64)
+        shell: pwsh
+        run: >
+          dotnet publish src/VidSlice/VidSlice.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=false
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}.0
+          -p:FileVersion=${{ steps.version.outputs.version }}.0
+          -o build/publish
+
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=${{ steps.version.outputs.version }}" installer/VidSlice.iss
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build/publish/* `
+            -DestinationPath "VidSlice-${{ steps.version.outputs.version }}-portable-win-x64.zip" -Force
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: VidSlice ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          files: |
+            installer/Output/VidSlice-Setup-${{ steps.version.outputs.version }}.exe
+            VidSlice-${{ steps.version.outputs.version }}-portable-win-x64.zip

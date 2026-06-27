@@ -1,0 +1,219 @@
+<ui:FluentWindow x:Class="VidSlice.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="VidSlice"
+        Icon="pack://application:,,,/Resources/app.ico"
+        Width="1000" Height="780"
+        MinWidth="820" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        AllowDrop="True"
+        Drop="OnFileDrop" DragOver="OnDragOver">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="VidSlice">
+            <ui:TitleBar.Header>
+                <StackPanel Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Cut24" FontSize="16" Margin="0,0,8,0" />
+                    <TextBlock Text="VidSlice" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,8,20,20">
+            <StackPanel>
+
+                <!-- Header + theme -->
+                <Grid Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Video Converter &amp; Splitter" FontSize="22" FontWeight="Bold" />
+                        <TextBlock Text="Add videos, choose how to split, then Convert &amp; Split. Lossless when possible."
+                                   Opacity="0.7" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <ui:Button HorizontalAlignment="Right" VerticalAlignment="Top"
+                               Appearance="Secondary" Click="OnCycleTheme"
+                               Content="{Binding Theme, StringFormat=Theme: {0}}"
+                               Icon="{ui:SymbolIcon WeatherMoon24}" />
+                </Grid>
+
+                <!-- Drop zone -->
+                <ui:Card Padding="0" Margin="0,0,0,12">
+                    <Border x:Name="DropZone" AllowDrop="True"
+                            Drop="OnFileDrop" DragOver="OnDragOver"
+                            DragEnter="OnDropZoneDragEnter" DragLeave="OnDropZoneDragLeave"
+                            Background="Transparent" BorderThickness="2" BorderBrush="Transparent"
+                            CornerRadius="8" Padding="16" MinHeight="84">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="26" HorizontalAlignment="Center" Opacity="0.8" />
+                            <TextBlock Text="Drag &amp; drop videos here (multiple supported)" HorizontalAlignment="Center"
+                                       FontWeight="SemiBold" Margin="0,8,0,4" />
+                            <ui:Button Content="Add files…" Icon="{ui:SymbolIcon FolderOpen24}"
+                                       AutomationProperties.Name="Add files"
+                                       Command="{Binding AddFilesCommand}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                </ui:Card>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Queue -->
+                    <ui:Card Grid.Column="0" Margin="0,0,12,12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="Queue" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <ui:Button Content="Remove" Appearance="Secondary"
+                                               Command="{Binding RemoveSelectedCommand}" Margin="0,0,6,0" />
+                                    <ui:Button Content="Clear" Appearance="Secondary"
+                                               Command="{Binding ClearCommand}" />
+                                </StackPanel>
+                            </Grid>
+                            <ListView ItemsSource="{Binding Queue}" SelectedItem="{Binding SelectedItem}"
+                                      AutomationProperties.Name="File queue"
+                                      MinHeight="160" MaxHeight="240" BorderThickness="0" Background="Transparent">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,4"
+                                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListView}}">
+                                            <Grid.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Retry this file" InputGestureText=""
+                                                              Command="{Binding PlacementTarget.Tag.RetryItemCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    <MenuItem Header="Open source location"
+                                                              Command="{Binding PlacementTarget.Tag.OpenItemSourceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    <Separator />
+                                                    <MenuItem Header="Move up"
+                                                              Command="{Binding PlacementTarget.Tag.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    <MenuItem Header="Move down"
+                                                              Command="{Binding PlacementTarget.Tag.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                    <Separator />
+                                                    <MenuItem Header="Remove from queue"
+                                                              Command="{Binding PlacementTarget.Tag.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                </ContextMenu>
+                                            </Grid.ContextMenu>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding StatusDetail}" Opacity="0.7" FontSize="12"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Height="4" Margin="0,4,8,0" />
+                                            </StackPanel>
+                                            <ui:TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                          FontSize="12" Opacity="0.8" Text="{Binding Status}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </DockPanel>
+                    </ui:Card>
+
+                    <!-- Options -->
+                    <ui:Card Grid.Column="1" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Options" FontWeight="SemiBold" Margin="0,0,0,10" />
+
+                            <TextBlock Text="Split mode" Opacity="0.7" FontSize="12" Margin="0,0,0,2" />
+                            <ComboBox ItemsSource="{Binding Modes}" DisplayMemberPath="Label"
+                                      SelectedValuePath="Value" SelectedValue="{Binding SelectedMode}"
+                                      AutomationProperties.Name="Split mode"
+                                      HorizontalAlignment="Stretch" Margin="0,0,0,10" />
+
+                            <StackPanel Visibility="{Binding IsBySize, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Max part size (MB)" Opacity="0.7" FontSize="12" Margin="0,0,0,2" />
+                                <ui:NumberBox Value="{Binding MaxSizeMb, Mode=TwoWay}" Minimum="1" Maximum="100000"
+                                              AutomationProperties.Name="Maximum part size in megabytes"
+                                              ClearButtonEnabled="False" Margin="0,0,0,10" />
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding IsByParts, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Number of parts" Opacity="0.7" FontSize="12" Margin="0,0,0,2" />
+                                <ui:NumberBox Value="{Binding PartCountValue, Mode=TwoWay}" Minimum="1" Maximum="999"
+                                              AutomationProperties.Name="Number of parts"
+                                              ClearButtonEnabled="False" Margin="0,0,0,10" />
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding IsByDuration, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Minutes per part" Opacity="0.7" FontSize="12" Margin="0,0,0,2" />
+                                <ui:NumberBox Value="{Binding SegmentMinutes, Mode=TwoWay}" Minimum="0.1" Maximum="100000"
+                                              AutomationProperties.Name="Minutes per part"
+                                              ClearButtonEnabled="False" Margin="0,0,0,10" />
+                            </StackPanel>
+
+                            <TextBlock Text="Output folder" Opacity="0.7" FontSize="12" Margin="0,0,0,2" />
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox Grid.Column="0" Text="{Binding OutputFolder, Mode=TwoWay}" Margin="0,0,6,0" />
+                                <ui:Button Grid.Column="1" Content="…" Command="{Binding BrowseOutputCommand}" />
+                            </Grid>
+
+                            <CheckBox Content="Convert to MP4" IsChecked="{Binding ConvertToMp4}" Margin="0,2" />
+                            <CheckBox Content="Keep original file" IsChecked="{Binding KeepOriginal}" Margin="0,2" />
+                            <CheckBox Content="Allow re-encode if needed" IsChecked="{Binding AllowReencode}" Margin="0,2" />
+                            <CheckBox Content="Exact split (frame-accurate, re-encodes)" IsChecked="{Binding ExactSplit}" Margin="0,2" />
+                        </StackPanel>
+                    </ui:Card>
+                </Grid>
+
+                <!-- Actions -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <ui:Button Content="Convert &amp; Split all" Appearance="Primary"
+                               AutomationProperties.Name="Convert and split all files"
+                               Icon="{ui:SymbolIcon Play24}" Command="{Binding RunAllCommand}" Margin="0,0,8,0" />
+                    <ui:Button Content="Cancel" Appearance="Secondary"
+                               AutomationProperties.Name="Cancel processing"
+                               Icon="{ui:SymbolIcon Stop24}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+                    <ui:Button Content="Open output folder" Appearance="Secondary"
+                               AutomationProperties.Name="Open output folder"
+                               Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding OpenOutputFolderCommand}" />
+                </StackPanel>
+
+                <!-- Overall progress + status -->
+                <ProgressBar Value="{Binding OverallProgress}" Maximum="100" Height="6" Margin="0,0,0,6" />
+                <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Opacity="0.85" Margin="0,0,0,12" />
+
+                <!-- Selected item parts -->
+                <ui:Card>
+                    <StackPanel>
+                        <TextBlock Text="Parts (selected file)" FontWeight="SemiBold" Margin="0,0,0,8" />
+                        <DataGrid ItemsSource="{Binding SelectedItem.Parts}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal" Background="Transparent"
+                                  BorderThickness="0" MaxHeight="260">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="*" />
+                                <DataGridTextColumn Header="Size (MB)" Binding="{Binding SizeMb}" Width="100" />
+                                <DataGridTextColumn Header="Duration (min)" Binding="{Binding DurationMinutes}" Width="120" />
+                                <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="120" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ui:Card>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</ui:FluentWindow>

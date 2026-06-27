@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+build/publish/
+
+# Installer + release artifacts
+installer/Output/
+*.zip
+
+# Bundled ffmpeg binaries (fetched via build\fetch-ffmpeg.ps1, not committed)
+src/VidSlice/Resources/ffmpeg/*.exe
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store

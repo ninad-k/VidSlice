@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+
+    <!-- Product / version metadata -->
+    <Product>VidSlice</Product>
+    <AssemblyTitle>VidSlice</AssemblyTitle>
+    <Company>VidSlice</Company>
+    <Description>Convert videos to MP4 and split them into size-limited parts.</Description>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Copyright>© 2026</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <!-- App icon also embedded as a WPF resource for the window/taskbar. -->
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
+  </ItemGroup>
+
+  <!-- Bundle any ffmpeg binaries placed in Resources\ffmpeg into the output. -->
+  <ItemGroup>
+    <None Include="Resources\ffmpeg\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Resources\ffmpeg" />
+  </ItemGroup>
+
+</Project>
