@@ -47,10 +47,10 @@ jobs:
           Write-Host "Releasing version $v"
 
       - name: Restore
-        run: dotnet restore VidSlice.slnx
+        run: dotnet restore VidSlice.sln
 
       - name: Test
-        run: dotnet test VidSlice.slnx -c Release
+        run: dotnet test VidSlice.sln -c Release
 
       - name: Bundle ffmpeg (essentials build)
         shell: pwsh
