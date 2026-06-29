@@ -19,8 +19,10 @@ public class MainViewModelTests
 
     private static MainViewModel NewVm(
         FakeFfmpegService fake, bool ffmpegAvailable = true, AppSettings? settings = null,
-        ISettingsService? settingsService = null)
-        => new(fake, settingsService ?? new FakeSettingsService(settings), NullLogger<MainViewModel>.Instance, ffmpegAvailable);
+        ISettingsService? settingsService = null, FakeTranscriptionService? transcription = null,
+        bool whisperAvailable = true)
+        => new(fake, settingsService ?? new FakeSettingsService(settings), NullLogger<MainViewModel>.Instance,
+               transcription ?? new FakeTranscriptionService(), ffmpegAvailable, whisperAvailable);
 
     [Fact]
     public void RunAll_DisabledWhenQueueEmpty()
@@ -206,6 +208,107 @@ public class MainViewModelTests
             Assert.False(vm.IsBusy);
         }
         finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public async Task RunAll_TranscribeOff_DoesNotCallTranscription()
+    {
+        var file = NewTempFile();
+        try
+        {
+            var transcription = new FakeTranscriptionService();
+            var vm = NewVm(new FakeFfmpegService(), transcription: transcription);
+            vm.Transcribe = false;
+            vm.AddFiles([file]);
+
+            await vm.RunAllCommand.ExecuteAsync(null);
+
+            Assert.Equal(0, transcription.Calls);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public async Task RunAll_TranscribeOn_PassesLanguageAndTranslateOptions()
+    {
+        var file = NewTempFile();
+        try
+        {
+            var transcription = new FakeTranscriptionService();
+            var vm = NewVm(new FakeFfmpegService(), transcription: transcription);
+            vm.Transcribe = true;
+            vm.TranscriptionLanguage = TranscriptionLanguages.Marathi;
+            vm.TranslateToEnglish = true;
+            vm.AddFiles([file]);
+
+            await vm.RunAllCommand.ExecuteAsync(null);
+
+            Assert.Equal(1, transcription.Calls);
+            Assert.Equal(TranscriptionLanguages.Marathi, transcription.LastOptions!.LanguageHint);
+            Assert.True(transcription.LastOptions.Translate);
+            Assert.Equal(file, transcription.LastOptions.InputPath);
+            Assert.Equal(BatchStatus.Done, vm.Queue[0].Status);
+            Assert.Contains("transcript", vm.Queue[0].StatusDetail);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public async Task RunAll_TranscribeOn_ButWhisperUnavailable_Skipped()
+    {
+        var file = NewTempFile();
+        try
+        {
+            var transcription = new FakeTranscriptionService();
+            var vm = NewVm(new FakeFfmpegService(), transcription: transcription, whisperAvailable: false);
+            vm.Transcribe = true;
+            vm.AddFiles([file]);
+
+            await vm.RunAllCommand.ExecuteAsync(null);
+
+            Assert.Equal(0, transcription.Calls);
+            Assert.Equal(BatchStatus.Done, vm.Queue[0].Status);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public async Task RunAll_TranscriptionFailure_MarksItemError_ButDoesNotCrash()
+    {
+        var file = NewTempFile();
+        try
+        {
+            var transcription = new FakeTranscriptionService
+            {
+                Factory = _ => throw new InvalidOperationException("whisper boom"),
+            };
+            var vm = NewVm(new FakeFfmpegService(), transcription: transcription);
+            vm.Transcribe = true;
+            vm.AddFiles([file]);
+
+            await vm.RunAllCommand.ExecuteAsync(null);
+
+            Assert.Equal(BatchStatus.Error, vm.Queue[0].Status);
+            Assert.Contains("whisper boom", vm.Queue[0].StatusDetail);
+            Assert.False(vm.IsBusy);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void Settings_TranscriptionRoundTripsThroughViewModel()
+    {
+        var svc = new FakeSettingsService();
+        var vm = NewVm(new FakeFfmpegService(), settingsService: svc);
+        vm.Transcribe = true;
+        vm.TranscriptionLanguage = TranscriptionLanguages.Hindi;
+        vm.TranslateToEnglish = true;
+
+        vm.SaveSettings();
+
+        Assert.True(svc.Current.Transcribe);
+        Assert.Equal("hi", svc.Current.TranscribeLanguage);
+        Assert.True(svc.Current.TranslateToEnglish);
     }
 
     [Fact]

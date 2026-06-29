@@ -11,6 +11,7 @@ A Windows desktop app (WPF, .NET 10) that **converts videos to MP4 and splits th
   - **By duration** — fixed minutes per part.
 - **Lossless when possible** — MP4-compatible sources (H.264/AAC, etc.) are stream-copied, so quality is identical and it's fast. Re-encode is opt-in.
 - **Exact split** (optional) — re-encodes with forced keyframes so cuts are frame-accurate instead of snapping to the nearest keyframe.
+- **Transcribe to text** (optional) — tick **Transcribe** to also produce a `.txt` transcript and a timestamped `.srt` for each file, using **local whisper.cpp** (fully offline, no API keys). Handles **mixed Hindi / Marathi / English** audio: leave the language on **Auto-detect**, or pick one; an optional **Translate to English** mode is available.
 - **Smart handling** — detects misnamed files (e.g. a video named `.m3u8`), avoids overwriting existing files (auto-suffix), checks free disk space first, and sanitizes output names.
 - **Remembers your settings** — output folder, mode, sizes, theme — in `%AppData%\VidSlice\settings.json`.
 - **Light / dark / system theme**, app icon, and a daily log file in `%AppData%\VidSlice\logs`.
@@ -23,6 +24,7 @@ The original file is **never deleted** unless you untick "Keep original file".
 - Windows 10/11
 - [.NET 10 SDK](https://dotnet.microsoft.com/) (to build) or the published self-contained exe (to run)
 - `ffmpeg` + `ffprobe` — auto-detected from a bundled copy, a winget install (`Gyan.FFmpeg`), or `PATH`.
+- For transcription only: `whisper-cli.exe` + a `ggml-*.bin` model — auto-detected from `Resources\whisper`, `%AppData%\VidSlice\models`, or `PATH`. See **Enable transcription** below.
 
 ## Run from source
 
@@ -46,6 +48,23 @@ dotnet test
 ```powershell
 pwsh -File build\fetch-ffmpeg.ps1     # downloads the ~80 MB essentials build into Resources\ffmpeg
 ```
+
+## Enable transcription (optional)
+
+Transcription uses [whisper.cpp](https://github.com/ggerganov/whisper.cpp) locally, so the
+**Transcribe** option is greyed out until a whisper binary **and** a model are present.
+
+```powershell
+pwsh -File build\fetch-whisper.ps1                 # whisper-cli.exe + ggml-large-v3 model
+pwsh -File build\fetch-whisper.ps1 -Model medium   # smaller (~1.5 GB) model
+pwsh -File build\fetch-whisper.ps1 -SkipModel      # binary only; supply a model yourself
+```
+
+This drops the files into `src\VidSlice\Resources\whisper` so they're bundled into builds.
+**Model size note:** `large-v3` is ~3 GB and gives the best Hindi/Marathi accuracy but bloats
+the installer — for distribution, prefer `-SkipModel` and drop a `ggml-*.bin` into
+`%AppData%\VidSlice\models` on the target machine (the app auto-detects it there). The model
+runs on CPU, so transcription of a long file can take a while.
 
 ## Package a single-file exe
 
@@ -87,6 +106,7 @@ dotnet publish src\VidSlice -c Release -r win-x64 --self-contained true -p:Publi
 src\VidSlice\
   Models\        MediaInfo, SplitPlan, PartResult, SplitMode, AppSettings, BatchItem
   Services\      FfmpegService, FfmpegLocator, ProgressParser, SplitPlanner,
+                 TranscriptionService, WhisperLocator, WhisperProgressParser,
                  SettingsService, PathUtils, FileLogger
   ViewModels\    MainViewModel (batch queue, modes, settings)
   MainWindow.*   Fluent UI (queue, mode selector, options, per-file results)

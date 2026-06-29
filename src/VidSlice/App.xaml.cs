@@ -42,6 +42,7 @@ public partial class App : Application
             {
                 services.AddSingleton<ISettingsService>(_ => new SettingsService());
                 services.AddSingleton<IFfmpegService, FfmpegService>();
+                services.AddSingleton<ITranscriptionService, TranscriptionService>();
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MainWindow>();
             })

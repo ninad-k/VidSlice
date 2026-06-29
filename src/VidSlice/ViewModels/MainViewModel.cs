@@ -12,24 +12,31 @@ namespace VidSlice.ViewModels;
 
 public sealed record SplitModeOption(string Label, SplitMode Value);
 
+public sealed record LanguageOption(string Label, string Value);
+
 public partial class MainViewModel : ObservableObject
 {
     private readonly IFfmpegService _ffmpeg;
+    private readonly ITranscriptionService _transcription;
     private readonly ISettingsService _settings;
     private readonly ILogger<MainViewModel> _log;
     private CancellationTokenSource? _cts;
 
     public MainViewModel()
-        : this(new FfmpegService(), new SettingsService(), NullLogger<MainViewModel>.Instance) { }
+        : this(new FfmpegService(), new SettingsService(), NullLogger<MainViewModel>.Instance,
+               new TranscriptionService()) { }
 
     public MainViewModel(
         IFfmpegService ffmpeg, ISettingsService settings, ILogger<MainViewModel> log,
-        bool? ffmpegAvailable = null)
+        ITranscriptionService transcription,
+        bool? ffmpegAvailable = null, bool? whisperAvailable = null)
     {
         _ffmpeg = ffmpeg;
+        _transcription = transcription;
         _settings = settings;
         _log = log;
         FfmpegAvailable = ffmpegAvailable ?? FfmpegLocator.IsAvailable;
+        WhisperAvailable = whisperAvailable ?? WhisperLocator.IsAvailable;
 
         LoadFromSettings(_settings.Load());
 
@@ -86,6 +93,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _exactSplit;
     [ObservableProperty] private string _theme = "System";
 
+    // ---- Transcription options ----
+
+    public IReadOnlyList<LanguageOption> Languages { get; } =
+    [
+        new("Auto-detect (mixed)", TranscriptionLanguages.Auto),
+        new("Hindi", TranscriptionLanguages.Hindi),
+        new("Marathi", TranscriptionLanguages.Marathi),
+        new("English", TranscriptionLanguages.English),
+    ];
+
+    [ObservableProperty] private bool _transcribe;
+    [ObservableProperty] private string _transcriptionLanguage = TranscriptionLanguages.Auto;
+    [ObservableProperty] private bool _translateToEnglish;
+
     // ---- State ----
 
     [ObservableProperty] private string _statusText = "Drop video files or click Add to begin.";
@@ -96,6 +117,7 @@ public partial class MainViewModel : ObservableObject
     private bool _isBusy;
 
     public bool FfmpegAvailable { get; }
+    public bool WhisperAvailable { get; }
 
     // ---- Settings mapping ----
 
@@ -110,6 +132,10 @@ public partial class MainViewModel : ObservableObject
         KeepOriginal = s.KeepOriginal;
         AllowReencode = s.AllowReencode;
         ExactSplit = s.ExactSplit;
+        Transcribe = s.Transcribe;
+        TranscriptionLanguage = string.IsNullOrWhiteSpace(s.TranscribeLanguage)
+            ? TranscriptionLanguages.Auto : s.TranscribeLanguage;
+        TranslateToEnglish = s.TranslateToEnglish;
         Theme = s.Theme;
     }
 
@@ -124,6 +150,9 @@ public partial class MainViewModel : ObservableObject
         KeepOriginal = KeepOriginal,
         AllowReencode = AllowReencode,
         ExactSplit = ExactSplit,
+        Transcribe = Transcribe,
+        TranscribeLanguage = TranscriptionLanguage,
+        TranslateToEnglish = TranslateToEnglish,
         Theme = Theme,
     };
 
@@ -275,10 +304,16 @@ public partial class MainViewModel : ObservableObject
                 ExactSplit = ExactSplit,
             };
 
+            // When transcribing too, the convert/split run owns the first 70% of the
+            // bar and transcription the last 30%.
+            bool doTranscribe = Transcribe && WhisperAvailable;
+            double runSpan = doTranscribe ? 0.7 : 1.0;
+
             var progress = new Progress<double>(f =>
             {
-                item.ProgressValue = f * 100;
-                onFraction(f);
+                double p = f * runSpan;
+                item.ProgressValue = p * 100;
+                onFraction(p);
             });
             var status = new Progress<string>(s => item.StatusDetail = s);
 
@@ -291,10 +326,35 @@ public partial class MainViewModel : ObservableObject
                 try { File.Delete(item.InputPath); } catch { /* leave original if locked */ }
             }
 
+            string transcriptNote = "";
+            if (doTranscribe)
+            {
+                var tProgress = new Progress<double>(f =>
+                {
+                    double p = runSpan + f * (1 - runSpan);
+                    item.ProgressValue = p * 100;
+                    onFraction(p);
+                });
+                var tStatus = new Progress<string>(s => item.StatusDetail = s);
+
+                var tOptions = new TranscriptionOptions
+                {
+                    InputPath = item.InputPath,
+                    OutputFolder = outFolder,
+                    BaseName = baseName,
+                    LanguageHint = TranscriptionLanguage,
+                    Translate = TranslateToEnglish,
+                };
+
+                var tResult = await _transcription.TranscribeAsync(tOptions, tProgress, tStatus, ct);
+                bool wrote = tResult.TxtPath is not null || tResult.SrtPath is not null;
+                transcriptNote = wrote ? " · transcript ✓" : " · ⚠ transcript empty";
+            }
+
             item.Status = BatchStatus.Done;
             var enc = result.WasReencoded ? " (re-encoded)" : " (lossless)";
             var lim = result.AllPartsUnderLimit ? "all under limit" : "⚠ some over limit";
-            item.StatusDetail = $"Done{enc} · {result.Parts.Count} part(s) · {lim}";
+            item.StatusDetail = $"Done{enc} · {result.Parts.Count} part(s) · {lim}{transcriptNote}";
             item.ProgressValue = 100;
         }
         catch (OperationCanceledException)

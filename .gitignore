@@ -10,6 +10,9 @@ installer/Output/
 # Bundled ffmpeg binaries (fetched via build\fetch-ffmpeg.ps1, not committed)
 src/VidSlice/Resources/ffmpeg/*.exe
 
+# Bundled whisper.cpp binary + model (fetched via build\fetch-whisper.ps1, not committed)
+src/VidSlice/Resources/whisper/
+
 # IDE
 .vs/
 .idea/

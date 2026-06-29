@@ -35,4 +35,9 @@
     <None Include="Resources\ffmpeg\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Resources\ffmpeg" />
   </ItemGroup>
 
+  <!-- Bundle any whisper.cpp binary/model placed in Resources\whisper into the output. -->
+  <ItemGroup>
+    <None Include="Resources\whisper\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Resources\whisper" />
+  </ItemGroup>
+
 </Project>
