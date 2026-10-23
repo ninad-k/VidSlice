@@ -17,6 +17,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Invoke-WebRequest's progress bar makes large downloads crawl on Windows
+# PowerShell 5.1; silencing it restores full speed.
+$ProgressPreference = "SilentlyContinue"
 
 $root = Split-Path -Parent $PSScriptRoot
 $dest = Join-Path $root "src\VidSlice\Resources\whisper"
